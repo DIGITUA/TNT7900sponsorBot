@@ -43,13 +43,16 @@ def remove_sheet_duplicates(sheet):
         seen = set()
         duplicates_indices = []
 
+        blacklist_keywords = ['job', 'careers', 'news', 'media', 'press']
+
         for i, row in enumerate(data):
-            key = tuple(row[:4])  # Unique key from first 4 columns
-            if key in seen:
-                # Record row index for deletion (offset by +2: header + 1-indexed)
+            key = tuple(row[:4])
+            url = row[1].lower() if len(row) > 1 else ""
+            if key in seen or any(bad in url for bad in blacklist_keywords):
                 duplicates_indices.append(i + 2)
             else:
                 seen.add(key)
+
 
         if duplicates_indices:
             print(f"🗑 Removing {len(duplicates_indices)} duplicates...")
@@ -261,6 +264,11 @@ async def process_company(name, previous_url=None):
         for page in contact_pages:
             if failed_pages.get(page, 0) >= MAX_RETRIES:
                 print(f"   ⚠️ Skipping {page} — too many failures.")
+                continue
+
+            # Skip blacklisted pages
+            if any(bad in page.lower() for bad in ['job', 'careers', 'news', 'media', 'press']):
+                print(f"   🚫 Skipping blacklisted page: {page}")
                 continue
 
             try:
