@@ -1,0 +1,135 @@
+import asyncio
+import aiohttp
+import re
+import time
+from bs4 import BeautifulSoup
+from datetime import datetime
+import gspread
+from google.oauth2.service_account import Credentials
+import sponsor1__vars
+
+# --------- GOOGLE SHEETS SETUP ---------
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+SHEET_ID = sponsor1__vars.SheetID1  # <- Replace this
+SHEET_NAME = 'Sheet1'  # Tab name
+SHEET_HEADER = ['Company Name', 'Timestamp']
+
+def init_sheet_client():
+    creds = Credentials.from_service_account_file("credentials.json", scopes=SCOPES)
+    client = gspread.authorize(creds)
+    sheet = client.open_by_key(SHEET_ID).worksheet(SHEET_NAME)
+    sheet.clear()
+    sheet.append_row(SHEET_HEADER)
+    return sheet
+
+# --- GLOBAL WRITE RATE LIMITER ---
+WRITE_LIMIT = 60  # per minute per user
+SECONDS_BETWEEN_WRITES = 60 / WRITE_LIMIT
+write_lock = asyncio.Semaphore(1)  # 1 write at a time
+
+async def safe_append_row(sheet, row, retries=3, delay=1.5):
+    for attempt in range(retries):
+        try:
+            async with write_lock:
+                sheet.append_row(row, value_input_option='RAW')
+                await asyncio.sleep(SECONDS_BETWEEN_WRITES)
+            return True
+        except Exception as e:
+            print(f"[!] Google Sheets write failed (attempt {attempt+1}): {e}")
+            await asyncio.sleep(delay)
+    return False
+    
+# --------- DUCKDUCKGO SEARCH ---------
+def duckduckgo_search(query, max_results=10):
+    print(f"🔍 Searching: {query}")
+    url = "https://html.duckduckgo.com/html/"
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    data = {'q': query}
+
+    res = requests.post(url, headers=headers, data=data, timeout=10)
+    soup = BeautifulSoup(res.text, "html.parser")
+
+    links = []
+    for a in soup.find_all("a", attrs={"class": "result__a"}, href=True):
+        link = a["href"]
+        if link.startswith("http") and len(links) < max_results:
+            links.append(link)
+    return links
+
+# --------- ASYNC SCRAPER ---------
+business_keywords = ["Inc", "LLC", "Ltd", "Corp", "Company", "Co", "Incorporated", "Corporation"]
+business_pattern = re.compile(r"\b(?:[A-Z][a-zA-Z&,\.\-\s]+)\s+(?:" + "|".join(business_keywords) + r")\b")
+
+seen_companies = set()
+
+#---------------------
+async def load_existing_companies(sheet):
+    print("🔁 Loading existing companies from sheet...")
+    try:
+        all_rows = sheet.get_all_values()
+        for row in all_rows[1:]:  # Skip header
+            if len(row) > 0:
+                seen_companies.add(row[0].strip())
+        print(f"✅ Loaded {len(seen_companies)} existing companies.")
+    except Exception as e:
+        print(f"[!] Failed to load existing data: {e}")
+
+seen_lock = asyncio.Lock()
+
+async def scrape_company_names_from_url(session, url, sheet):
+    try:
+        async with session.get(url, timeout=10) as response:
+            text = await response.text()
+            soup = BeautifulSoup(text, "html.parser")
+            candidates = set()
+
+            for tag in soup.find_all(["li", "td", "th", "p", "span", "div"]):
+                raw = tag.get_text(strip=True)
+                if not raw or len(raw) > 100:
+                    continue
+
+                match = business_pattern.search(raw)
+                if match:
+                    name = match.group().strip()
+                    candidates.add(name)
+
+            uploaded = 0
+            async with seen_lock:
+                new_names = [n for n in candidates if n not in seen_companies]
+                for name in new_names:
+                    timestamp = datetime.now().isoformat()
+                    if await safe_append_row(sheet, [name, timestamp]):
+                        seen_companies.add(name)
+                        uploaded += 1
+
+            print(f"   ✅ Scraped {url} — {uploaded} new companies.")
+    except Exception as e:
+        print(f"   ❌ Error scraping {url}: {e}")
+
+# --------- MAIN ASYNC WORKER ---------
+async def process_query(query, sheet, max_urls=5):
+    urls = duckduckgo_search(query, max_results=max_urls)
+    async with aiohttp.ClientSession(headers={'User-Agent': 'Mozilla/5.0'}) as session:
+        tasks = [scrape_company_names_from_url(session, url, sheet) for url in urls]
+        await asyncio.gather(*tasks)
+
+# --------- ENTRY POINT ---------
+async def main():
+    sheet = init_sheet_client()
+
+    await load_existing_companies(sheet)  # Load deduped list before scraping
+    
+    queries = [
+        "list of businesses in Wisconsin USA",
+        "list of businesses in Illinois USA",
+        "list of S&P 500 companies 2024"
+    ]
+
+    print("🚀 Starting async scrape + live write to Google Sheets...\n")
+    for query in queries:
+        await process_query(query, sheet)
+    print("\n🎉 Finished scraping all queries.")
+
+if __name__ == "__main__":
+    import requests
+    asyncio.run(main())

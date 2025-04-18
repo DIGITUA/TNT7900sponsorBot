@@ -1,0 +1,93 @@
+import csv
+import requests
+from bs4 import BeautifulSoup
+from datetime import datetime
+
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+}
+
+def duckduckgo_search(query, max_results=10):
+    print(f"🔍 DDG search init: '{query}'")
+    url = "https://html.duckduckgo.com/html/"
+    data = {'q': query}
+    res = requests.post(url, headers=HEADERS, data=data, timeout=10)
+    soup = BeautifulSoup(res.text, "html.parser")
+    print("   → Search HTML received.")
+
+    links = []
+    for a in soup.select('.result__a'):
+        href = a.get('href')
+        if href and href.startswith('http'):
+            links.append(href)
+        if len(links) >= max_results:
+            break
+
+    print(f"   → Found {len(links)} links.")
+    return links
+
+import re
+
+def scrape_company_names_from_url(url):
+    try:
+        print(f"   🕷️ Scraping: {url}")
+        response = requests.get(url, headers=HEADERS, timeout=10)
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        companies = set()
+
+        # Define patterns that suggest business names
+        business_keywords = ["Inc", "LLC", "Ltd", "Corp", "Company", "Co", "Incorporated", "Corporation"]
+        business_pattern = re.compile(r"\b(?:[A-Z][a-zA-Z&,\.\-\s]+)\s+(?:" + "|".join(business_keywords) + r")\b")
+
+        for tag in soup.find_all(["li", "td", "th", "p", "span", "div"]):
+            text = tag.get_text(strip=True)
+
+            if not text or len(text) > 100:  # skip empty or too long lines
+                continue
+
+            # Check for strong candidates by matching business pattern
+            match = business_pattern.search(text)
+            if match:
+                cleaned = match.group().strip()
+                companies.add(cleaned)
+
+        print(f"     → Found {len(companies)} company-like names.")
+        return list(companies)
+
+    except Exception as e:
+        print(f"     [!] Failed to scrape {url}: {e}")
+        return []
+
+def save_to_csv(company_list, filename):
+    timestamp = datetime.now().isoformat()
+    with open(filename, mode='w', newline='', encoding='utf-8') as file:
+        writer = csv.writer(file)
+        writer.writerow(['Company Name', 'Timestamp'])
+        for company in company_list:
+            writer.writerow([company, timestamp])
+
+def main():
+    queries = {
+        "Wisconsin Businesses": "list of businesses in Wisconsin USA",
+        "Illinois Businesses": "list of businesses in Illinois USA",
+        "S&P 500 Companies": "list of S&P 500 companies 2025"
+    }
+
+    all_companies = []
+
+    for label, query in queries.items():
+        links = duckduckgo_search(query, max_results=5)
+
+        for link in links:
+            names = scrape_company_names_from_url(link)
+            all_companies.extend(names)
+
+    # Deduplicate
+    unique_companies = list(set(all_companies))
+
+    save_to_csv(unique_companies, "companies_list.csv")
+    print(f"\n✅ Saved {len(unique_companies)} companies to companies_list.csv")
+
+if __name__ == "__main__":
+    main()
