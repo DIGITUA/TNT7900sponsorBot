@@ -1,0 +1,217 @@
+----------------------------------------------------
+Setup Guide: TNT7900SponsorBot on Windows with VS Code
+----------------------------------------------------
+
+This guide will walk you through setting up and running the Python scripts from the TNT7900SponsorBot repository on your local Windows machine using Visual Studio Code (VS Code).
+
+**Prerequisites:**
+1.  Windows Operating System
+2.  Visual Studio Code installed (Download from: https://code.visualstudio.com/)
+3.  Internet access
+
+**Step 1: Install Python**
+
+1.  **Download Python:**
+    * Go to the official Python website: https://www.python.org/downloads/windows/
+    * Download the latest stable version of Python for Windows (e.g., Python 3.9+).
+2.  **Install Python:**
+    * Run the downloaded installer.
+    * **IMPORTANT:** On the first screen of the installer, check the box that says "Add Python to PATH". This will make it easier to run Python from the command line.
+    * Click "Install Now" or choose "Customize installation" if needed.
+3.  **Verify Installation:**
+    * Open Command Prompt (search "cmd" in the Start menu).
+    * Type `python --version` and press Enter. You should see the installed Python version.
+    * Type `pip --version` and press Enter. You should see the pip version (Python's package installer).
+
+**Step 2: Set Up Visual Studio Code**
+
+1.  **Install Python Extension:**
+    * Open VS Code.
+    * Go to the Extensions view by clicking the Extensions icon in the Activity Bar on the side of the window or by pressing `Ctrl+Shift+X`.
+    * Search for "Python" (by Microsoft) and click "Install".
+2.  **Open the Project Folder:**
+    * If you have the project files as a folder, go to "File" > "Open Folder..." and select the main folder containing all the Python scripts (e.g., `TNT7900sponsorBot-0ba09da6dedd2b348e0208d5158922762049501a`).
+
+**Step 3: Project Setup (within VS Code)**
+
+1.  **Open an Integrated Terminal:**
+    * In VS Code, open the integrated terminal by going to "Terminal" > "New Terminal" or pressing ``Ctrl+` `` (backtick).
+    * You should see a command prompt appear at the bottom of the VS Code window, usually PowerShell or Command Prompt.
+2.  **Create a Virtual Environment (Recommended):**
+    * A virtual environment keeps project dependencies isolated.
+    * In the terminal, navigate to your project folder if you're not already there.
+    * Run the following command to create a virtual environment named `.venv`:
+        ```bash
+        python -m venv .venv
+        ```
+3.  **Activate the Virtual Environment:**
+    * In the terminal, run:
+        ```bash
+        .\.venv\Scripts\activate
+        ```
+    * You should see `(.venv)` appear at the beginning of your terminal prompt, indicating the virtual environment is active.
+    * VS Code might also prompt you to select this environment for the workspace; if so, agree.
+4.  **Install Dependencies:**
+    * The scripts require several Python libraries. Create a file named `requirements.txt` in the root of your project folder and paste the following lines into it:
+        ```
+        aiohttp
+        beautifulsoup4
+        gspread
+        google-auth
+        google-auth-oauthlib
+        google-api-python-client
+        requests
+        pandas
+        tldextract
+        httpx
+        jmespath
+        ```
+    * In the activated virtual environment terminal, run the following command to install all listed dependencies:
+        ```bash
+        pip install -r requirements.txt
+        ```
+
+**Step 4: Configuration Files and Variables**
+
+Several scripts rely on external configuration files or variables within a specific Python file (`sponsor1__vars.py`).
+
+1.  **`credentials.json` (for Google Sheets API):**
+    * Scripts like `Sponsor_1.py`, `sheetsWriter.py`, and `sponsor_5_pass2.py` interact with Google Sheets.
+    * You need to set up a Google Cloud Platform (GCP) project, enable the Google Sheets API, and create service account credentials.
+    * **How to obtain `credentials.json`:**
+        1.  Go to the Google Cloud Console: https://console.cloud.google.com/
+        2.  Create a new project or select an existing one.
+        3.  Enable the "Google Sheets API" for your project (Search for it in the API Library).
+        4.  Go to "Credentials" under "APIs & Services".
+        5.  Click "+ CREATE CREDENTIALS" and choose "Service account".
+        6.  Fill in the service account details (name, ID). Grant it a role like "Editor" for now if you're unsure, or a more restricted role if you know how (e.g., permissions to edit specific sheets).
+        7.  After creating the service account, find it in the list, click on it, go to the "KEYS" tab.
+        8.  Click "ADD KEY" > "Create new key". Choose "JSON" as the key type and click "CREATE".
+        9.  A JSON file will be downloaded. **Rename this file to `credentials.json` and place it in the root of your project folder.**
+    * **Share your Google Sheet:** You also need to share your Google Sheet(s) with the `client_email` found inside your `credentials.json` file (give it "Editor" permission on the sheet).
+
+2.  **`sponsor1__vars.py`:**
+    * This file is imported by several scripts and seems to hold crucial variables. You will need to create this file in the root of your project folder.
+    * Create a new file named `sponsor1__vars.py` and add variables like the following (examples provided, you'll need your actual values):
+        ```python
+        # sponsor1__vars.py
+
+        # For Google Sheets
+        SheetID = "YOUR_GOOGLE_SHEET_ID_HERE"  # The long ID from the URL of your Google Sheet
+        SheetID1 = "ANOTHER_GOOGLE_SHEET_ID_IF_NEEDED" # Used by sheetsWriter.py
+
+        # For Sponsor_1.py input CSV files (paths relative to the script)
+        # These should be the names or paths to CSV files containing company lists.
+        sponsorList1 = "path/to/your/first_sponsor_list.csv"
+        sponsorList2 = "path/to/your/second_sponsor_list.csv"
+        # Ensure these CSV files exist and contain company names in the first column.
+
+        # For sponsor_3_copy.py (Applicant Data for form filling)
+        APPLICANT_DATA = {
+            'name': 'Your Full Name or Organization Name',
+            'first_name': 'YourFirstName',
+            'last_name': 'YourLastName',
+            'email': 'youremail@example.com',
+            'phone': '123-456-7890',
+            'group': 'Your Team/Group Name', # e.g., FRC Team 7900
+            'organization': 'Your Organization If Applicable',
+            'city': 'Your City',
+            'state': 'Your State',
+            'zip': 'Your ZipCode',
+            'country': 'Your Country',
+            'website': '[https://yourwebsite.com](https://yourwebsite.com)',
+            'form_of_address': 'Mr./Ms./Mx. or Organization', # Salutation
+            # Add any other common fields you want to auto-fill
+            'message': 'We are seeking sponsorship for our activities...' # Default message
+        }
+
+        # For sponsor_3_copy.py (Path to background info file)
+        BACKGROUND_INFO_FILE = "applicant_background.txt"
+
+        # For sponsor_5_pass2.py (Keywords for identifying sponsorship forms)
+        SPONSORSHIP_KEYWORDS = [
+            'sponsorship', 'grant', 'funding', 'donation', 'support', 'partner', 'apply',
+            'nonprofit', '501(c)(3)', 'foundation', 'community', 'outreach', 'youth',
+            'education', 'frc', 'contact us', 'application', 'inquiry'
+        ]
+        ```
+
+3.  **`applicant_background.txt`:**
+    * Used by `sponsor_3_copy.py`. [cite: 1]
+    * Create this file in the root of your project folder.
+    * It should contain a detailed message or background information about your organization/team that can be used to fill larger text areas in forms.
+    * Example content:
+        ```
+        [Your Team/Organization Name] is a [description, e.g., high school robotics team, nonprofit organization] dedicated to [your mission, e.g., promoting STEM education, supporting youth in our community]. We are seeking support for [specific project/need]. Our activities include [list activities].
+        ```
+
+4.  **Input CSV Files (for `Sponsor_1.py`):**
+    * The `Sponsor_1.py` script expects to read company names from CSV files defined in `sponsor1__vars.py` (e.g., `sponsorList1`).
+    * Make sure these CSV files exist at the specified paths and have company names in the first column.
+
+5.  **`result.json` (for Instagram scripts):**
+    * `instagram_scrape6.py` outputs scraped data to `result.json`.
+    * `TeamProgressAutoUpdatorFromInsta3.py` reads `result.json` as input to generate `teamHistory.txt`.
+    * You don't need to create `result.json` initially if you run `instagram_scrape6.py` first.
+
+**Step 5: Running the Scripts**
+
+1.  **Open the Terminal:** Make sure your VS Code integrated terminal is open and the virtual environment is active (`(.venv)` should be visible in the prompt).
+2.  **Navigate to the script's directory (if needed):** Most scripts seem to be in the root of the project, so you might not need to change directories.
+3.  **Run a script:** Use the `python` command followed by the script name.
+
+    * **`Sponsor_1.py`:** Finds and collects sponsorship information.
+        ```bash
+        python Sponsor_1.py
+        ```
+        * Ensure `sponsor1__vars.py` is configured with input CSV paths and `SheetID`.
+        * Outputs data to Google Sheets and a CSV file (e.g., `sponsorship_info_autoSponsorListName.csv`).
+
+    * **`instagram_scrape6.py`:** Scrapes Instagram user posts.
+        ```bash
+        python instagram_scrape6.py
+        ```
+        * You'll likely need to edit the `target_username` inside the script.
+        * Outputs to `result.json`.
+
+    * **`TeamProgressAutoUpdatorFromInsta3.py`:** Extracts captions from `result.json`.
+        ```bash
+        python TeamProgressAutoUpdatorFromInsta3.py
+        ```
+        * Requires `result.json` to exist (output of `instagram_scrape6.py`).
+        * Outputs to `teamHistory.txt`.
+
+    * **`sponsor_3_copy.py`:** Scrapes a given URL for forms and attempts to fill/submit (currently simulates submission).
+        ```bash
+        python sponsor_3_copy.py
+        ```
+        * It will prompt you to "Enter a URL to check for forms:".
+        * Requires `sponsor1__vars.py` (for `APPLICANT_DATA`) and `applicant_background.txt`.
+
+    * **`sponsor_5_pass2.py`:** Checks URLs from a Google Sheet for sponsorship forms.
+        ```bash
+        python sponsor_5_pass2.py
+        ```
+        * Reads URLs from the Google Sheet specified by `SheetID` in `sponsor1__vars.py` (expects URLs in the second column, starting from `START_ROW_INDEX`).
+        * Updates columns G and H (by default) in the sheet with "✅" or "❌".
+
+    * **`sponsor_7_pass3.py`:** Classifies email addresses.
+        ```bash
+        python sponsor_7_pass3.py
+        ```
+        * Runs a predefined list of test emails. You can modify the `test_emails` list in the script for your own testing.
+
+    * **`sheetsWriter.py`:** This is more of a utility module used by other scripts and not typically run directly, though it has an example `if __name__ == "__main__":` block.
+
+**Step 6: Notes and Troubleshooting**
+
+* **Modules Not Found:** If you get an error like `ModuleNotFoundError: No module named 'module_name'`, ensure your virtual environment is active and that you've run `pip install -r requirements.txt`.
+* **API Rate Limits:** Be mindful of API rate limits when interacting with Google Sheets or scraping websites (especially Instagram). Scripts might fail or your IP could be temporarily blocked if you make too many requests in a short period. The scripts have some basic delays, but aggressive use might still cause issues.
+* **Instagram Scraping:** Instagram frequently changes its website structure and internal APIs. The `instagram_scrape6.py` script might break without notice and may require updates to its GraphQL Document ID or request structure. Using such scrapers can also be against Instagram's Terms of Service.
+* **Form Submission (`sponsor_3_copy.py`):** The script `sponsor_3_copy.py` is currently set up to *simulate* form submission (the line `submission_payload = {}` effectively sends empty data). For actual submission, you would change this to `submission_payload = filled_data`. **Use with extreme caution and ensure you understand what data is being sent before enabling real submissions.** Automated form submission can be complex and error-prone.
+* **File Paths:** Ensure all file paths in `sponsor1__vars.py` (like for CSVs or `BACKGROUND_INFO_FILE`) are correct relative to where you are running the scripts.
+* **Permissions:** Ensure your `credentials.json` service account has the necessary "Editor" permissions on the Google Sheets you are trying to write to.
+
+----------------------------------------------------
+End of Guide
+----------------------------------------------------

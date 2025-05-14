@@ -1,0 +1,11 @@
+aiohttp
+beautifulsoup4
+gspread
+google-auth
+google-auth-oauthlib
+google-api-python-client
+requests
+pandas
+tldextract
+httpx
+jmespath
